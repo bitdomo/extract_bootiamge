@@ -31,6 +31,23 @@ int main(int argc, char* argv[]){
     __image_file_table* image_file_table = NULL;
     FILE* input = NULL;
     FILE* output = NULL;
+    char* image_names_to_check[] = {"ufs",
+                                   "ufs",
+                                   "partition:0",
+                                   "partition:1",
+                                   "partition:2",
+                                   "partition:3",
+                                   "bl1",
+                                   "pbl",
+                                   "bl2",
+                                   "abl",
+                                   "bl31",
+                                   "tzsw",
+                                   "gsa",
+                                   "gsa_bl1",
+                                   "ldfw",
+                                   "gcf",
+                                   "ufsfwupdate"};
     char filename[256] = {0};
     if(argc == 1){
         printf("Not enough argument\n");
@@ -51,6 +68,12 @@ int main(int argc, char* argv[]){
 
     if(header.magic[0] != 'F' || header.magic[1] != 'B' || header.magic[2] != 'P' || header.magic[3] != 'K'){
         printf("Invalid magic!\nExpected: FBPK\nGot: %c%c%c%c", header.magic[0], header.magic[1], header.magic[2], header.magic[3]);
+        fclose(input);
+        return -1;
+    }
+    if(header.image_file_count != 17){
+        printf("Image file count is not 17!\nImage file count is: %d", header.image_file_count);
+        fclose(input);
         return -1;
     }
 
@@ -67,10 +90,20 @@ int main(int argc, char* argv[]){
     image_file_table = (__image_file_table*)malloc(sizeof(__image_file_table)*header.image_file_count);
     if(image_file_table == NULL){
         printf("Failed to allocate memory for \"image_file_table\"\n");
+        free(image_file_table);
+        fclose(input);
         return -1;
     }
 
     fread(image_file_table, sizeof(__image_file_table), header.image_file_count, input);
+
+    for(int i = 0; i < header.image_file_count; i++){
+        if(strcmp(image_file_table[i].image_name,image_names_to_check[i])){
+            printf("Image number %d has unknown image name: %s", i+1, image_file_table[i].image_name);
+            fclose(input);
+            return -1;
+        }
+    }
 
     for(int i = 0; i < header.image_file_count; i++){
         printf("(INFO) image file: %d\n", i+1);
@@ -85,7 +118,6 @@ int main(int argc, char* argv[]){
     }
 
     for(int i = 0; i < header.image_file_count; i++){
-
         if(i == 2 || i == 3 || i == 4 || i == 5){
             image_file_table[i].image_name[9] = '_';
         }
@@ -106,6 +138,9 @@ int main(int argc, char* argv[]){
         output = fopen(filename, "wb");
         if(output == NULL){
             printf("Failed to open %s\n", image_file_table[i].image_name);
+            free(image_file_table);
+            fclose(output);
+            fclose(input);
             return -1;
         }
 
